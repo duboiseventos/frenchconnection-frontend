@@ -1,24 +1,16 @@
-// ============================================================
-// RACINE DE L'APPLICATION NEXT.JS
-// Enveloppe toutes les pages avec les contextes globaux
-// ============================================================
-
-import { FournisseurPanier }  from '../context/CartContext';
-import BoutonWhatsApp         from '../components/BoutonWhatsApp';
+// Point d'entrée — SessionProvider + Panier + WhatsApp sur toutes les pages
+import { SessionProvider }   from 'next-auth/react';
+import { FournisseurPanier } from '../context/CartContext';
+import BoutonWhatsApp        from '../components/BoutonWhatsApp';
 import '../styles/globals.css';
 
-export default function Application({ Component, pageProps }) {
+export default function Application({ Component, pageProps: { session, ...pageProps } }) {
   return (
-    <FournisseurPanier>
-      {/* Le composant de la page en cours */}
-      <Component {...pageProps} />
-
-      {/* Bouton WhatsApp visible sur toutes les pages */}
-      <BoutonWhatsApp />
-    </FournisseurPanier>
+    <SessionProvider session={session}>
+      <FournisseurPanier>
+        <Component {...pageProps} />
+        <BoutonWhatsApp />
+      </FournisseurPanier>
+    </SessionProvider>
   );
 }
-
-
-
-

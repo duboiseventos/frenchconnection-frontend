@@ -1,30 +1,28 @@
 // ============================================================
 // CONTEXTE PANIER
-// Gère l'état global du panier avec persistance localStorage
+// Correction : suppression de l'initializer function SSR
+// qui causait des crashes côté serveur (Next.js)
+// Hydratation depuis localStorage via useEffect uniquement
 // ============================================================
 
-import { createContext, useContext, useReducer, useEffect } from 'react';
+import { createContext, useContext, useReducer, useEffect, useState } from 'react';
 
 const ContextePanier = createContext();
 
 const etatInitial = {
-  articles:       [],   // Liste des articles ajoutés
-  codeReduction:  null, // Code de réduction appliqué
-  montantReduction: 0,  // Montant déduit
+  articles:         [],
+  codeReduction:    null,
+  montantReduction: 0,
 };
 
-// ── Reducer : toutes les actions possibles sur le panier ──────
 function reduceurPanier(etat, action) {
   switch (action.type) {
 
     case 'AJOUTER_ARTICLE': {
-      // Chercher si l'article existe déjà (même produit + même taille)
       const existant = etat.articles.find(
         (a) => a._id === action.article._id && a.taille === action.article.taille
       );
-
       if (existant) {
-        // Incrémenter la quantité
         return {
           ...etat,
           articles: etat.articles.map((a) =>
@@ -34,7 +32,6 @@ function reduceurPanier(etat, action) {
           ),
         };
       }
-      // Ajouter le nouvel article
       return {
         ...etat,
         articles: [...etat.articles, { ...action.article, quantite: 1 }],
@@ -66,6 +63,10 @@ function reduceurPanier(etat, action) {
         montantReduction: action.montant,
       };
 
+    // Restauration complète depuis localStorage
+    case 'RESTAURER':
+      return action.etat;
+
     case 'VIDER_PANIER':
       return etatInitial;
 
@@ -75,30 +76,39 @@ function reduceurPanier(etat, action) {
 }
 
 export function FournisseurPanier({ children }) {
-  const [etat, dispatch] = useReducer(
-    reduceurPanier,
-    etatInitial,
-    // Initialisation depuis localStorage
-    (etatDefaut) => {
-      if (typeof window !== 'undefined') {
-        const sauvegarde = localStorage.getItem('fc_panier');
-        return sauvegarde ? JSON.parse(sauvegarde) : etatDefaut;
-      }
-      return etatDefaut;
-    }
-  );
+  const [etat, dispatch] = useReducer(reduceurPanier, etatInitial);
+  const [hydrate, setHydrate] = useState(false);
 
-  // Synchroniser avec localStorage à chaque changement
+  // Hydratation depuis localStorage — côté client uniquement
+  // useEffect ne s'exécute jamais côté serveur → pas de crash SSR
   useEffect(() => {
-    localStorage.setItem('fc_panier', JSON.stringify(etat));
-  }, [etat]);
+    try {
+      const sauvegarde = localStorage.getItem('fc_panier');
+      if (sauvegarde) {
+        const parsed = JSON.parse(sauvegarde);
+        // Restaurer l'état complet d'un coup
+        dispatch({ type: 'RESTAURER', etat: parsed });
+      }
+    } catch {
+      // Si localStorage est corrompu, on repart de zéro silencieusement
+      localStorage.removeItem('fc_panier');
+    }
+    setHydrate(true);
+  }, []);
+
+  // Sauvegarder dans localStorage à chaque changement
+  // Seulement après l'hydratation initiale pour ne pas écraser avec l'état vide
+  useEffect(() => {
+    if (hydrate) {
+      localStorage.setItem('fc_panier', JSON.stringify(etat));
+    }
+  }, [etat, hydrate]);
 
   // Calculs dérivés
   const sousTotal = etat.articles.reduce(
     (acc, a) => acc + (a.precioOferta ?? a.precio) * a.quantite,
     0
   );
-
   const nombreArticles = etat.articles.reduce(
     (acc, a) => acc + a.quantite,
     0
@@ -118,5 +128,4 @@ export function FournisseurPanier({ children }) {
   );
 }
 
-// Hook personnalisé pour utiliser le panier
 export const usePanier = () => useContext(ContextePanier);

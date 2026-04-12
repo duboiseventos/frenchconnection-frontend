@@ -1,56 +1,89 @@
-// Page catégorie dynamique — /categoria/camisetas-importadas
+// ============================================================
+// PAGE CATÉGORIE
+// Corrections :
+// 1. Suppression du double import useState
+// 2. Récupération de l'ID catégorie via son slug avant de filtrer
+// ============================================================
+
 import { useState, useEffect } from 'react';
 import { useRouter }           from 'next/router';
 import Head                    from 'next/head';
 import Link                    from 'next/link';
 import { apiListeProduits }    from '../../services/api';
 import CarteProduit            from '../../components/CarteProduito';
-import { useState as useSt }   from 'react';
+import api                     from '../../services/api';
 
-// Noms lisibles pour chaque slug
 const NOMS_CATEGORIES = {
-  'camisetas-importadas': 'Camisetas Importadas',
-  'ropa-original':        'Ropa Original',
-  'ofertas':              'Ofertas',
+  'camisetas-importadas': { nom: 'Camisetas Importadas', desc: 'Autenticidad garantizada en todos los productos ✓', premium: true  },
+  'ropa-original':        { nom: 'Ropa Original',        desc: 'Colección completa nacional e internacional',      premium: false },
+  'ofertas':              { nom: 'Ofertas',               desc: 'Hasta 40% de descuento en productos seleccionados', premium: false },
 };
 
-export default function PageCategorie() {
-  const router              = useRouter();
-  const { slug }            = router.query;
-  const [produits, setProduits]   = useState([]);
-  const [chargement, setChargement] = useState(true);
-  const [ordre, setOrdre]   = useState('destacado');
-  const [taille, setTaille] = useState('');
+// Données de démo — affichées si le backend n'est pas connecté
+const PRODUITS_DEMO = [
+  { _id:'1', nombre:'Camiseta Tommy Hilfiger', marca:'Tommy Hilfiger', precio:18900, precioOferta:null,  slug:'tommy-1',   esImportado:true,  imagenes:[], talles:[{taille:'M',stock:3},{taille:'L',stock:5}] },
+  { _id:'2', nombre:'Polo Ralph Lauren',       marca:'Ralph Lauren',   precio:24500, precioOferta:null,  slug:'ralph-1',   esImportado:true,  imagenes:[], talles:[{taille:'S',stock:2},{taille:'M',stock:4}] },
+  { _id:'3', nombre:'Camiseta Lacoste',         marca:'Lacoste',        precio:21000, precioOferta:16800, slug:'lacoste-1', esImportado:true,  imagenes:[], talles:[{taille:'M',stock:1},{taille:'L',stock:2}] },
+  { _id:'4', nombre:'Buzo Calvin Klein',        marca:'Calvin Klein',   precio:15900, precioOferta:null,  slug:'ck-1',      esImportado:false, imagenes:[], talles:[{taille:'L',stock:8}] },
+];
 
+export default function PageCategorie() {
+  const router   = useRouter();
+  const { slug } = router.query;
+
+  const [produits, setProduits]         = useState([]);
+  const [chargement, setChargement]     = useState(true);
+  const [ordre, setOrdre]               = useState('destacado');
+  const [tailleFiltree, setTailleFiltree] = useState('');
+  const [categorieId, setCategorieId]   = useState(null);
+
+  // Étape 1 : récupérer l'ID de la catégorie depuis son slug
   useEffect(() => {
     if (!slug) return;
+
+    const recupererCategorie = async () => {
+      try {
+        const { data } = await api.get(`/produits/categories/${slug}`);
+        setCategorieId(data._id);
+      } catch {
+        // Catégorie non trouvée → afficher démo
+        setProduits(PRODUITS_DEMO);
+        setChargement(false);
+      }
+    };
+
+    recupererCategorie();
+  }, [slug]);
+
+  // Étape 2 : charger les produits une fois qu'on a l'ID catégorie
+  useEffect(() => {
+    if (!categorieId) return;
     chargerProduits();
-  }, [slug, ordre, taille]);
+  }, [categorieId, ordre, tailleFiltree]);
 
   const chargerProduits = async () => {
     setChargement(true);
     try {
       const { data } = await apiListeProduits({
-        categoria: slug,
-        orden: ordre,
-        talle: taille || undefined,
+        categoria: categorieId,
+        orden:     ordre,
+        talle:     tailleFiltree || undefined,
       });
       setProduits(data.produits || []);
-    } catch (err) {
-      console.error(err);
-      // Données de démo si le backend n'est pas encore connecté
+    } catch {
       setProduits(PRODUITS_DEMO);
     } finally {
       setChargement(false);
     }
   };
 
-  const nom = NOMS_CATEGORIES[slug] || slug;
+  const infoCat = NOMS_CATEGORIES[slug] || { nom: slug, desc: '', premium: false };
 
   return (
     <>
       <Head>
-        <title>{nom} — FrenchConnection</title>
+        <title>{infoCat.nom} — FrenchConnection</title>
+        <meta name="description" content={infoCat.desc} />
       </Head>
 
       <div className="min-h-screen bg-white">
@@ -63,10 +96,10 @@ export default function PageCategorie() {
               <p className="text-xs text-gray-400 tracking-widest uppercase -mt-1">Buenos Aires</p>
             </div>
           </Link>
-          <div className="flex gap-6 text-sm text-gray-500">
+          <div className="hidden md:flex gap-6 text-sm text-gray-500">
             <Link href="/categoria/camisetas-importadas" className="hover:text-gray-900">Camisetas</Link>
-            <Link href="/categoria/ropa-original" className="hover:text-gray-900">Ropa Original</Link>
-            <Link href="/categoria/ofertas" className="hover:text-gray-900">Ofertas</Link>
+            <Link href="/categoria/ropa-original"        className="hover:text-gray-900">Ropa Original</Link>
+            <Link href="/categoria/ofertas"              className="hover:text-gray-900">Ofertas</Link>
           </div>
           <Link href="/carrito" className="text-sm border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50">
             Carrito
@@ -75,21 +108,25 @@ export default function PageCategorie() {
 
         <div className="max-w-6xl mx-auto px-8 py-10">
 
-          {/* Encabezado */}
+          {/* En-tête */}
           <div className="mb-8">
-            <Link href="/" className="text-sm text-gray-400 hover:text-gray-600">← Inicio</Link>
-            <h1 className="font-serif text-4xl mt-2">{nom}</h1>
-            {slug === 'camisetas-importadas' && (
-              <p className="text-amber-700 text-sm mt-1 font-medium">✓ Autenticidad garantizada en todos los productos</p>
+            <Link href="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+              ← Inicio
+            </Link>
+            <h1 className="font-serif text-4xl mt-2">{infoCat.nom}</h1>
+            {infoCat.desc && (
+              <p className={`text-sm mt-1 font-medium ${infoCat.premium ? 'text-amber-700' : 'text-gray-500'}`}>
+                {infoCat.desc}
+              </p>
             )}
           </div>
 
-          {/* Filtros */}
+          {/* Filtres */}
           <div className="flex gap-3 mb-8 flex-wrap">
             <select
               value={ordre}
               onChange={(e) => setOrdre(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none"
             >
               <option value="destacado">Relevancia</option>
               <option value="precio_asc">Precio: menor a mayor</option>
@@ -99,9 +136,9 @@ export default function PageCategorie() {
             </select>
 
             <select
-              value={taille}
-              onChange={(e) => setTaille(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+              value={tailleFiltree}
+              onChange={(e) => setTailleFiltree(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none"
             >
               <option value="">Todos los talles</option>
               {['XS','S','M','L','XL','XXL'].map(t => (
@@ -134,11 +171,3 @@ export default function PageCategorie() {
     </>
   );
 }
-
-// Données de démo affichées si le backend n'est pas encore connecté
-const PRODUITS_DEMO = [
-  { _id:'1', nombre:'Camiseta Tommy Hilfiger', marca:'Tommy Hilfiger', precio:18900, precioOferta:null, slug:'tommy-1', esImportado:true, imagenes:[], talles:[{taille:'M',stock:3},{taille:'L',stock:5}] },
-  { _id:'2', nombre:'Polo Ralph Lauren',       marca:'Ralph Lauren',   precio:24500, precioOferta:null, slug:'ralph-1', esImportado:true, imagenes:[], talles:[{taille:'S',stock:2},{taille:'M',stock:4}] },
-  { _id:'3', nombre:'Camiseta Lacoste',         marca:'Lacoste',        precio:21000, precioOferta:16800, slug:'lacoste-1', esImportado:true, imagenes:[], talles:[{taille:'M',stock:1},{taille:'L',stock:2}] },
-  { _id:'4', nombre:'Buzo Calvin Klein',        marca:'Calvin Klein',   precio:15900, precioOferta:null, slug:'ck-1',     esImportado:false, imagenes:[], talles:[{taille:'L',stock:8}] },
-];
