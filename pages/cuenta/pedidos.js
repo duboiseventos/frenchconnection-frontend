@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Head                    from 'next/head';
 import Link                    from 'next/link';
 import { useRouter }           from 'next/router';
-import { apiMesCommandes }     from '../../services/api';
+import { getMyOrders }     from '../../services/api';
 
 // Couleurs et labels pour chaque état de commande
 const ESTADOS = {
@@ -36,7 +36,7 @@ export default function PagePedidos() {
 
   const chargerCommandes = async () => {
     try {
-      const { data } = await apiMesCommandes();
+      const { data } = await getMyOrders();
       setCommandes(data);
     } catch (err) {
       console.error(err);
