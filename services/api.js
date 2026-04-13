@@ -1,17 +1,22 @@
 // ============================================================
 // SERVICE API
 // Instance Axios centralisée + injection automatique du token JWT
-// Correction : export default de l'instance pour usage direct
+// Version prête pour la production
 // ============================================================
 
 import axios from 'axios';
 
+// 🔴 Vérification critique : s'assurer que la variable d'environnement existe
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  console.error('❌ NEXT_PUBLIC_API_URL non défini');
+}
+
 // Instance Axios configurée avec l'URL du backend
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
 });
 
-// Injecter le token JWT dans chaque requête si l'utilisateur est connecté
+// Injection automatique du token JWT si présent
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('fc_token');
@@ -22,22 +27,43 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Authentification ──────────────────────────────────────────
-export const apiInscription     = (donnees) => api.post('/auth/inscription', donnees);
-export const apiConnexion       = (donnees) => api.post('/auth/connexion', donnees);
-export const apiMonProfil       = ()        => api.get('/auth/profil');
-export const apiToggleFavoris   = (id)      => api.post(`/auth/favoris/${id}`);
+// ── AUTHENTICATION ───────────────────────────────────────────
+// Fonctions liées à l'authentification utilisateur
 
-// ── Produits ──────────────────────────────────────────────────
-export const apiListeProduits   = (params)  => api.get('/produits', { params });
-export const apiDetailProduit   = (slug)    => api.get(`/produits/${slug}`);
-export const apiProduitsVedette = ()        => api.get('/produits/vedette');
-export const apiRecherche       = (q)       => api.get('/produits/rechercher', { params: { q } });
+export const registerUser   = (data) => api.post('/auth/inscription', data);
+export const loginUser      = (data) => api.post('/auth/connexion', data);
+export const getMyProfile   = ()     => api.get('/auth/profil');
+export const toggleFavorite = (id)   => api.post(`/auth/favoris/${id}`);
 
-// ── Commandes ─────────────────────────────────────────────────
-export const apiCreerCommande   = (donnees) => api.post('/commandes', donnees);
-export const apiMesCommandes    = ()        => api.get('/commandes/mes-pedidos');
-export const apiDetailCommande  = (id)      => api.get(`/commandes/${id}`);
+// ── PRODUCTS ─────────────────────────────────────────────────
+// Gestion des produits
 
-// Export default pour usage direct : api.get('/produits/categories/camisetas-importadas')
+export const getProducts = async (params) => {
+  const res = await api.get('/produits', { params });
+  return res.data.produits;
+};
+
+export const getProductBySlug = async (slug) => {
+  const res = await api.get(`/produits/${slug}`);
+  return res.data;
+};
+
+export const getFeaturedProducts = async () => {
+  const res = await api.get('/produits/vedette');
+  return res.data;
+};
+
+export const searchProducts = async (query) => {
+  const res = await api.get('/produits/rechercher', { params: { q: query } });
+  return res.data;
+};
+
+// ── ORDERS ───────────────────────────────────────────────────
+// Gestion des commandes
+
+export const createOrder = (data) => api.post('/commandes', data);
+export const getMyOrders = ()     => api.get('/commandes/mes-pedidos');
+export const getOrderById = (id)  => api.get(`/commandes/${id}`);
+
+// Export de l'instance pour usage direct si nécessaire
 export default api;

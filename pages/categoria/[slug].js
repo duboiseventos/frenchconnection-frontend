@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { useRouter }           from 'next/router';
 import Head                    from 'next/head';
 import Link                    from 'next/link';
-import { apiListeProduits }    from '../../services/api';
+import { getProducts }    from '../../services/api';
 import CarteProduit            from '../../components/CarteProduito';
 import api                     from '../../services/api';
 
@@ -64,7 +64,7 @@ export default function PageCategorie() {
   const chargerProduits = async () => {
     setChargement(true);
     try {
-      const { data } = await apiListeProduits({
+      const { data } = await getProducts({
         categoria: categorieId,
         orden:     ordre,
         talle:     tailleFiltree || undefined,
